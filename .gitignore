@@ -1,0 +1,12 @@
+*.npy
+*.pt
+__pycache__/
+logs/
+*.JPG
+*.mp4
+*.csv
+*.gz
+*.txt
+cat << 'EOF' > .gitignore
+multi_modal/image_text/outputs_mimic/
+multi_modal/image_text/outputs_spotdiff/
