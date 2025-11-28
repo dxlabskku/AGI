@@ -1,16 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-make_manifest_spotdiff.py
-- spot-diff_pytorch/1cls/<object>/train|test|ground_truth 구조에 맞춰 manifest.csv 생성
-- it_baseline_train.py 학습용 포맷 (id,img_paths,report_text,split)
 
-사용 예시:
-python make_manifest_spotdiff.py \
-  --root /data/AGI/datasets/spot-diff_pytorch/1cls \
-  --out /data/AGI/datasets/spot-diff_pytorch/manifest.csv \
-  --val_from_train --val_ratio 0.1
-"""
 import os, csv, random, argparse
 from pathlib import Path
 
@@ -56,7 +46,7 @@ def main():
 
     rows_train, rows_val, rows_test = [], [], []
 
-    # 각 object 순회
+
     for obj_dir in sorted(root.iterdir()):
         if not obj_dir.is_dir():
             continue
@@ -65,7 +55,7 @@ def main():
         # test
         test_rows = scan_split(obj_dir, "test")
 
-        # train 일부를 val로 이동
+
         if args.val_from_train and len(train_rows) > 2:
             n_val = max(1, int(len(train_rows) * args.val_ratio))
             random.shuffle(train_rows)
@@ -78,7 +68,7 @@ def main():
         rows_train.extend(train_rows)
         rows_test.extend(test_rows)
 
-    # CSV 저장
+
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", newline="", encoding="utf-8") as f:
