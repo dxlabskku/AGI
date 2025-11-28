@@ -82,7 +82,7 @@ def train(args):
     train_ds = PTListDataset(args.train_json)
     val_ds   = PTListDataset(args.val_json)
 
-    # 모델 차원 자동 추론(여러 모달 섞임 대응)
+  
     model = build_model_from_dataset(args.train_json, NUM_CLASSES).to(device)
 
     train_dl = DataLoader(
@@ -100,7 +100,7 @@ def train(args):
         collate_fn=collate_mm
     )
 
-    # 손실함수: 배치별로 y 타입을 보고 선택 (싱글라벨: CE, 멀티라벨: BCE)
+
     ce_loss  = torch.nn.CrossEntropyLoss()
    
 
@@ -184,7 +184,7 @@ def train(args):
             f"train_loss={train_loss:.4f} acc={train_acc:.4f} f1={train_f1:.4f} | "
             f"val_loss={val_loss:.4f} acc={val_acc:.4f} f1={val_f1:.4f}")
         # ---------- SAVE ----------
-        # 1) epoch 단위로 저장
+
         ckpt_path = os.path.join(save_dir, f"epoch_{epoch:03d}.pt")
         torch.save({
             "epoch": epoch,
