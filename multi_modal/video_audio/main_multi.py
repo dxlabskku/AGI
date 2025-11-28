@@ -204,36 +204,32 @@ if __name__ == "__main__":
     p.add_argument("--total_json", type=str, default="/data/jupyter/AGI/multiall_notime.json")
     p.add_argument("--train_json", type=str, default="/data/jupyter/AGI/encoders/uni_modal/series/outputs_final/train.json")
     p.add_argument("--val_json", type=str, default='/data/jupyter/AGI/encoders/uni_modal/series/outputs_final/test.json')
+    p.add_argument("--test_json", type=str, default='/data/jupyter/AGI/encoders/uni_modal/series/outputs_final/test.json')
     p.add_argument("--batch_size", type=int, default=8)
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--thr", type=float, default=0.5, help="멀티라벨 판정 threshold")
-    p.add_argument("--ckpt_dir", type=str, default='/data/jupyter/AGI/series_ckpt')
+    p.add_argument("--ckpt_dir", type=str, default='/data/jupyter/AGI/series_ckpt', help='모델 가중치 저장 경로')
+    p.add_argument("--ckpt_load", type=str, default='/data/jupyter/AGI/series_ckpt/epoch_034.pt', help='테스트 가중치 경로 ')          
     p.add_argument("--log_json", type=str, default="train_multi.json")
+    p.add_argument("--train", default=True)
     args = p.parse_args() 
-
-    train(args)
-    # test data = /data/jupyter/AGI/datasets/mimic-cxr-p10-mini/features/test.json + '/data/jupyter/AGI/datasets/XD-violence/test/test.json+
-    # + /data/jupyter/AGI/encoders/uni_modal/series/test.json  
-    '''
-    device='cuda'
-    test_dir='/data/jupyter/AGI/encoders/uni_modal/series/outputs_final/test.json'
-    test_ds   = PTListDataset(test_dir)
-
-    test_dl = DataLoader(
-        test_ds,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=4,
-        collate_fn=collate_mm
-    )
+    if args.train:
+        train(args)
+    else:
+        device='cuda'
+        test_ds   = PTListDataset(args.test_json)
+        test_dl = DataLoader(
+            test_ds,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=4,
+            collate_fn=collate_mm
+        )
+        criterion = torch.nn.CrossEntropyLoss()
+        model = build_model_from_dataset(args.test_json, NUM_CLASSES).to(device)
+        optim = AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
+        checkpoint = torch.load(args.ckpt_load, map_location='cuda')
+        model.load_state_dict(checkpoint["model_state"])
+        test(model, test_dl, device, criterion)
     
-    criterion = torch.nn.CrossEntropyLoss()
-
-    model = build_model_from_dataset('/data/jupyter/AGI/encoders/uni_modal/series/outputs_final/train.json', NUM_CLASSES).to(device)
-    optim = AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
-    checkpoint = torch.load('/data/jupyter/AGI/series_ckpt/epoch_034.pt', map_location='cuda')
-    model.load_state_dict(checkpoint["model_state"])
-
-    test(model, test_dl, device, criterion)
-    '''
