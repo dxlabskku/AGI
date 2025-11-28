@@ -3,12 +3,12 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import torchvision
 from torchvision.io import read_video
 
-# 백엔드 설정 (가능할 때만)
+
 if hasattr(torchvision, "set_video_backend"):
     try:
         torchvision.set_video_backend("pyav")
     except Exception:
-        pass  # pyav 미설치/미지원이면 무시
+        pass  
 import os
 import  argparse, warnings
 from typing import List, Tuple, Dict
@@ -17,7 +17,7 @@ import torch
 import torch.nn.functional as F
 from torchvision.io import read_video
 from torchcodec.decoders import VideoDecoder
-# === 너의 비디오/CLAP 백본 ===
+
 from encoder2 import (
     VideoSwinBackbone, VideoSwinCfg,
     AudioCLAPWindowed, CLAPAudioCfg,
@@ -70,20 +70,20 @@ TS_SEC    = T_FRAMES / FPS_FIXED           # 0.6666667 s
 AUDIO_WIN = 0.96                           # 960 ms
 AUDIO_HOP = TS_SEC                         # 스니펫 길이만큼 hop, 끝 시간 정렬
 def read_video_safe(path):
-    # 1) torchvision 시도
+
     try:
         v, a, info = read_video(path, pts_unit="sec")
         return v, a, info
     except Exception:
         pass
-    # 2) decord 폴백
+
     try:
         import decord as de
         de.bridge.set_bridge('torch')
         vr = de.VideoReader(path)
         v = vr.get_batch(list(range(len(vr))))  # [T,H,W,3] uint8
         info = {"video_fps": float(vr.get_avg_fps()), "video_frames": int(len(vr))}
-        # 오디오는 별도로 필요 시 torchaudio로
+
         try:
             import torchaudio
             a, sr = torchaudio.load(path)       # [C,S] -> [S,C]
@@ -96,31 +96,24 @@ def read_video_safe(path):
         raise RuntimeError(f"Failed to decode video: {path} ({e})")
     
 def snippet_times(duration: float) -> List[Tuple[float,float,float]]:
-    """
-    논문 규격: 24fps, 16프레임 스니펫(길이 TS_SEC). stride=TS_SEC (겹침 없음; 오디오가 길어서 overlap 발생)
-    반환: (S, E, E) 리스트 (마지막 E는 오디오 윈도우 끝 시간 정렬에 사용)
-    """
+ 
     spans = []
     s = 0.0
     while s + TS_SEC <= duration:
         e = s + TS_SEC
         spans.append((s, e, e))  # E를 보존
         s += TS_SEC
-    # 남는 꼬리는 버림 (논문 재현 목적)
+
     return spans
 
 def sample_indices_24fps_end_aligned(e: float, file_fps: float, T: int = T_FRAMES) -> List[int]:
-    """
-    비디오: 끝시간 e에 정렬된 16프레임 (24fps 기준) 시계열 → 원본 파일 fps로 매핑
-    24fps 프레임 시각: e - (1/24), e - (2/24), ..., e - (16/24)
-    (시작 시각은 e-TS)
-    """
-    # 시간축 (과거 → 현재)
+   
+    
     times = torch.tensor([e - (i+1)/FPS_FIXED for i in range(T)][::-1], dtype=torch.float32)
     idx = (times * file_fps).round().long().tolist()
     return idx
 
-# ---------- 핵심: 한 영상 인코딩 ----------
+
 @torch.inference_mode()
 def extract_for_video_strict(
     video_path: str,
@@ -145,11 +138,11 @@ def extract_for_video_strict(
     spans = snippet_times(duration)  # (S,E,E)
 
     vtoks, atoks, span_list = [], [], []
-    MICRO = 8  # 스니펫 마이크로배치 (VRAM에 맞춰 수정)
+    MICRO = 8 
     for i in range(0, len(spans), MICRO):
         batch_spans = spans[i:i+MICRO]
 
-        # ---- 비디오: [b,16,3,224,224], 끝정렬 샘플링
+        
         v_batch = []
         for (s, e, E) in batch_spans:
             idx = sample_indices_24fps_end_aligned(E, file_fps, T_FRAMES)
@@ -159,7 +152,7 @@ def extract_for_video_strict(
             v_batch.append(fr); span_list.append([s, e])
         v_batch = torch.stack(v_batch, dim=0).to(device)
 
-        # ---- 오디오: 각 스니펫 끝시간 E에 대해 [E-0.96, E]
+
         a_batch = []
         for (s, e, E) in batch_spans:
             s_win = max(0.0, E - AUDIO_WIN)
@@ -174,7 +167,7 @@ def extract_for_video_strict(
             a_batch.append(seg)
         a_batch = torch.stack(a_batch, dim=0).to(device)  # [b, N]
 
-        # ---- 인코딩
+
         with torch.autocast(device_type=("cuda" if "cuda" in device else "cpu"), dtype=torch.float16, enabled=amp):
             vtok = vid_model(v_batch)  # [b, Lv, Dv]
            
@@ -204,7 +197,7 @@ def extract_for_video_strict(
 from datetime import datetime
 import json, csv, sys
 from tqdm import tqdm
-# ---------- 실행부 ----------
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--video_root", default='/data/jupyter/AGI/datasets/XD-violence/test/video',type=str)
@@ -244,7 +237,7 @@ def main():
             for rec in report["records"]:
                 w.writerow([rec["fid"], rec["status"], rec.get("reason",""), rec.get("out_path","")])
         print(f"[REPORT] saved -> {base}.json / {base}.csv")
-    # 리스트 → ids
+  
     ids = read_list_ids(args.list_path)
 
     n = len(ids) if args.limit <= 0 else min(args.limit, len(ids))
@@ -258,7 +251,7 @@ def main():
             "save_fail": 0,
             "other_fail": 0,
         },
-        "records": []  # 각 파일별 로그
+        "records": []  
     }
 
     pbar = tqdm(range(n), desc="Extracting", ncols=100)
@@ -268,7 +261,7 @@ def main():
         reason = ""
         out_path = os.path.join(out_split, f"{fid}{args.save_suffix}.pt")
 
-        # 1) 경로 찾기
+
         mp4_path = os.path.join(args.video_root, f"{fid}.mp4")
         if not os.path.exists(mp4_path):
             found = None
@@ -286,7 +279,7 @@ def main():
                 continue
             mp4_path = found
 
-        # 2) 이미 존재하면 스킵
+
         if os.path.exists(out_path):
             status = "skipped_exists"
             reason = "output already exists"
@@ -296,7 +289,7 @@ def main():
             continue
 
         try:
-            # 3) 추출
+   
             feats = extract_for_video_strict(
                 video_path=mp4_path,
                 vid_model=vid,
@@ -307,11 +300,11 @@ def main():
                 device=device,
             )
 
-            # 3-1) 빈 스팬(스니펫 0개) 체크
+
             spans = feats.get("spans", None)
             is_empty = (spans is None) or (getattr(spans, "numel", lambda: 0)() == 0) or (len(spans) == 0)
 
-            # 4) 메타/라벨 추가
+    
             bin_label, multi_label = parse_label_from_id(fid)
             feats["id"] = fid
             feats["labels"] = {"binary": bin_label, "multilabel": multi_label}
@@ -319,7 +312,7 @@ def main():
             feats["meta"]["src_path"] = mp4_path
             feats["meta"]["empty"] = bool(is_empty)
 
-            # 5) 저장
+            
             try:
                 torch.save(feats, out_path)
             except Exception as se:
@@ -330,7 +323,7 @@ def main():
                 pbar.set_postfix_str(status)
                 continue  # 다음 파일로
 
-            # 6) 상태 기록
+          
             if is_empty:
                 status = "empty_spans"
                 report["counts"]["empty_spans"] += 1
@@ -342,7 +335,7 @@ def main():
             pbar.set_postfix_str(status)
 
         except RuntimeError as re:
-            # read_video_safe 등 디코더 실패
+        
             status = "decode_fail"
             reason = f"{re}"
             report["counts"]["decode_fail"] += 1
@@ -350,20 +343,20 @@ def main():
             pbar.set_postfix_str(status)
 
         except Exception as e:
-            # 그 밖의 모든 실패
+        
             status = "other_fail"
             reason = f"{e}"
             report["counts"]["other_fail"] += 1
             report["records"].append({"fid": fid, "status": status, "reason": reason, "out_path": ""})
             pbar.set_postfix_str(status)
 
-    # 요약 출력
+  
     print("\n=== Extraction Summary ===")
     for k, v in report["counts"].items():
         print(f"{k:>15}: {v}")
     sys.stdout.flush()
 
-    # 리포트 저장
+ 
     write_report(out_split, args.split_name, report)
     print("Done ->", out_split)
 
