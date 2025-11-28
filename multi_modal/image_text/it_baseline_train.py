@@ -1,26 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Image–Text 공통임베딩 백본 (단일 파일 버전)
-- 이미지: CLIP ViT-B/16 (transformers)
-- 텍스트: CLIP Text + e5-base (둘 다 사용, 내부에서 fuse)
-- 학습: InfoNCE (단일 또는 멀티-포지티브)
-- 출력: z_img, z_txt(=fused), presence_mask, quality, meta, s_align
 
-필수 준비물(권장):
-  pip install torch torchvision transformers sentencepiece pandas pillow tqdm
-
-Input manifest (CSV) 예시 컬럼:
-  id,img_paths,report_text,subject,view,time,split
-- img_paths: 한 스터디에 여러 이미지일 경우 '|'로 구분: "/path/a.png|/path/b.png"
-- split: train/val/test 중 하나
-
-실행 예시:
-  python it_baseline_train.py --manifest ./mimic_manifest.csv --out_dir ./outputs \
-      --epochs 5 --batch_size 64 --dim 256 --loss multi
-  # 학습 후 임베딩 덤프
-  python it_baseline_train.py --manifest ./mimic_manifest.csv --out_dir ./outputs --dump_only --ckpt ./outputs/ckpt.pt
-"""
 from __future__ import annotations
 import os, io, json, math, random, argparse, time
 from dataclasses import dataclass
