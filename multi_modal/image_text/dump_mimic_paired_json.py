@@ -1,4 +1,4 @@
-# 레이블 파일 (mimic-cxr-2.0.0-chexpert.csv.gz) 반영하는걸로 수정 
+
 
 import os, json, gzip
 from pathlib import Path
@@ -67,7 +67,7 @@ def collect_studies(root_p10: Path, stop_pat: str) -> List[Dict]:
 
 def load_chexpert_map(csv_path: str, uncertain_as_positive: bool):
     df = pd.read_csv(csv_path, compression="infer")
-    # 일부 배포본은 열 이름/순서가 약간 다를 수 있어 필요한 열만 보존
+
     cols = ["study_id"] + [c for c in CHEXPERT_14 if c in df.columns]
     df = df[cols].drop_duplicates("study_id")
     df.set_index("study_id", inplace=True)
@@ -83,7 +83,7 @@ def load_chexpert_map(csv_path: str, uncertain_as_positive: bool):
                 labels_14[k] = None
             else:
                 labels_14[k] = float(v)
-        # binary: 13개 이상 라벨 중(“No Finding” 제외) 양성 판단
+
         vals = []
         for k,v in labels_14.items():
             if k == "No Finding": 
@@ -170,117 +170,4 @@ if __name__ == "__main__":
     main()
 
 
-# import os, json, glob
-# from pathlib import Path
-# from typing import List, Dict
-# import numpy as np
-# import torch
-# import torch.nn.functional as F
-# from PIL import Image
-# import pydicom
-# from transformers import CLIPModel, CLIPProcessor, AutoModel, AutoTokenizer
 
-# def dcm_to_pil(dcm_path: str) -> Image.Image:
-#     ds = pydicom.dcmread(dcm_path)
-#     arr = ds.pixel_array.astype(np.float32)
-#     arr = arr - arr.min()
-#     denom = (arr.max() - arr.min()) + 1e-6
-#     arr = (arr / denom) * 255.0
-#     arr = np.clip(arr, 0, 255).astype(np.uint8)
-#     img = Image.fromarray(arr).convert("RGB")
-#     return img
-
-# def default_labeler(report_text: str):
-#     """간단한 규칙 기반 라벨링 (없으면 None)"""
-#     if "pulmonary embol" in report_text.lower():
-#         return 1
-#     return 0
-
-# @torch.no_grad()
-# def encode_image(clip_model, clip_proc, imgs: List[Image.Image], device):
-#     feats = []
-#     for img in imgs:
-#         inputs = clip_proc(images=img, return_tensors="pt").to(device)
-#         feat = clip_model.get_image_features(**inputs)
-#         feat = F.normalize(feat, dim=-1)
-#         feats.append(feat.squeeze(0))
-#     return torch.stack(feats, dim=0).mean(0)
-
-# @torch.no_grad()
-# def encode_text(e5_model, e5_tok, text: str, device):
-#     prompt = f"passage: {text.strip() or 'empty report'}"
-#     inputs = e5_tok([prompt], return_tensors="pt", truncation=True, max_length=512).to(device)
-#     emb = e5_model(**inputs).last_hidden_state[:, 0]
-#     emb = F.normalize(emb, dim=-1)
-#     return emb.squeeze(0)
-
-# def collect_studies(root_p10: Path, stop_pat: str) -> List[Dict]:
-#     patients = sorted([p for p in root_p10.iterdir() if p.is_dir() and p.name.startswith("p")])
-#     studies = []
-#     for p in patients:
-#         if p.name > stop_pat:
-#             break
-#         for s in sorted(p.glob("s*")):
-#             txt = p / f"{s.name}.txt"
-#             dcm = sorted(s.glob("*.dcm"))
-#             if not dcm:
-#                 continue
-#             studies.append({
-#                 "patient_id": p.name,
-#                 "study_id": s.name,
-#                 "dcm_paths": [str(x) for x in dcm],
-#                 "txt_path": str(txt) if txt.exists() else None
-#             })
-#     return studies
-
-# def main():
-#     import argparse
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("--root_p10", required=True)
-#     parser.add_argument("--out_path", required=True)
-#     parser.add_argument("--stop_at", default="p10015725")
-#     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-#     args = parser.parse_args()
-
-#     device = args.device
-#     out_path = Path(args.out_path)
-#     out_path.parent.mkdir(parents=True, exist_ok=True)
-
-#     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device).eval()
-#     clip_proc = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-#     e5_model = AutoModel.from_pretrained("intfloat/e5-base").to(device).eval()
-#     e5_tok = AutoTokenizer.from_pretrained("intfloat/e5-base")
-
-#     studies = collect_studies(Path(args.root_p10), args.stop_at)
-#     print(f"[info] collected {len(studies)} studies")
-
-#     with open(out_path, "w", encoding="utf-8") as fout:
-#         for i, item in enumerate(studies, 1):
-#             imgs = [dcm_to_pil(p) for p in item["dcm_paths"]]
-#             img_feat = encode_image(clip_model, clip_proc, imgs, device)
-#             txt_feat = torch.zeros(768)
-
-#             report_text = ""
-#             if item["txt_path"] and os.path.exists(item["txt_path"]):
-#                 with open(item["txt_path"], "r", encoding="utf-8", errors="ignore") as f:
-#                     report_text = f.read()
-#                 txt_feat = encode_text(e5_model, e5_tok, report_text, device)
-
-#             label = default_labeler(report_text)
-
-#             record = {
-#                 "patient_id": item["patient_id"],
-#                 "study_id": item["study_id"],
-#                 "img_feat": img_feat.cpu().tolist(),
-#                 "text_feat": txt_feat.cpu().tolist(),
-#                 "label": label,
-#             }
-#             fout.write(json.dumps(record) + "\n")
-
-#             if i % 10 == 0:
-#                 print(f"[{i}/{len(studies)}] processed {item['patient_id']}/{item['study_id']}")
-
-#     print(f"[done] saved JSONL: {out_path}")
-
-# if __name__ == "__main__":
-#     main()
