@@ -1,47 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-SKAB 데이터셋용 TS2Vec 기반 시계열 이상 탐지 베이스라인
 
-전체 파이프라인:
-1. TS2Vec 스타일의 자기지도학습으로 시계열 인코더 학습 (정상 데이터만 사용)
-2. 학습된 인코더로 정상 데이터의 임베딩(d=256) 추출 → 메모리 뱅크 구축
-3. 테스트 데이터의 임베딩과 메모리 뱅크 비교 → kNN/KDE 기반 이상 점수 계산
-4. KDE 교차점 기반 임계값 설정 및 평가
 
-사용 예시
----------
-# 1) 정상 데이터로 인코더 자기지도학습
-python sieun_baseline_train.py train \
-  --data_root /path/to/SKAB \
-  --window 32 --stride 1 --batch 128 --epochs 80
-
-# 2) 학습 데이터의 임베딩으로 메모리 뱅크 구축 (kNN + KDE 저장)
-python sieun_baseline_train.py build_bank \
-  --data_root /path/to/SKAB --window 32 --stride 1
-
-# 3) 테스트 데이터 평가 (CSV + 메트릭 출력, F1-PA 포함)
-python sieun_baseline_train.py eval \
-  --data_root /path/to/SKAB --window 32 --stride 1 \
-  --score_head kde --smooth 5 --out_dir ./outputs
-
-# 4) 특성 데이터 추출 (CSV + JSON)
-python sieun_baseline_train.py export_features \
-  --data_root /path/to/SKAB --out_dir ./feature_dumps
-
-데이터셋 구조 (SKAB)
---------------------
-- data_root/
-    train/*.csv    # 정상 데이터 (라벨이 있어도 학습시 무시됨)
-    test/*.csv     # 이상치 포함 가능, 'anomaly' 또는 'label' 컬럼 (0/1)
-- CSV 컬럼: time[, ...features..., label?]
-- 라벨 컬럼 (선택): ['anomaly','label','y','class','Class','is_anomaly'] 중 하나 (0/1)
-
-주의사항
---------
-- 테스트 데이터에 라벨이 없으면 점수만 출력 (메트릭 계산 불가)
-- 의도적으로 경량 의존성 사용: numpy, pandas, torch, sklearn
-"""
 from __future__ import annotations
 import os, math, argparse, json, random
 from dataclasses import dataclass
@@ -148,8 +106,7 @@ def read_skab_csv(path):
     return df, y
 
 
-# ⚠️ 주의: 아래 함수는 현재 사용되지 않음 (read_skab_csv를 대신 사용)
-# 코드 정리 시 제거 고려
+
 LABEL_CANDIDATES = ["anomaly", "label", "y"]
 
 def load_csv_with_optional_label(path: Path) -> Tuple[pd.DataFrame, Optional[np.ndarray]]:
@@ -173,18 +130,7 @@ def list_csvs(folder: Path) -> List[Path]:
     return sorted([p for p in folder.glob("*.csv") if p.is_file()])
 
 def align_features(X: np.ndarray, expected_in: int) -> np.ndarray:
-    """특성 차원을 expected_in에 맞춤 (잘라내기 또는 zero-padding)
     
-    학습 시와 테스트 시 특성 개수가 다를 때 사용
-    - 초과: 앞에서부터 expected_in개만 사용
-    - 부족: 뒤에 0으로 패딩
-    
-    Args:
-        X: [N, L, F] 형태의 윈도우 배열
-        expected_in: 기대하는 특성 개수
-    Returns:
-        [N, L, expected_in] 형태로 정렬된 배열
-    """
     F = X.shape[-1]
     if F == expected_in:
         return X
@@ -197,10 +143,7 @@ def align_features(X: np.ndarray, expected_in: int) -> np.ndarray:
 
 
 class SlidingWindowSeries(Dataset):
-    """슬라이딩 윈도우 방식으로 시계열을 분할하는 Dataset
-    
-    여러 CSV 파일의 시계열을 윈도우 단위로 잘라서 학습/평가용 데이터셋 생성
-    """
+   
     def __init__(self, 
                  arrays: List[np.ndarray],
                  labels: Optional[List[np.ndarray]],
