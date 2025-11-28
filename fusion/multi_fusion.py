@@ -1,4 +1,4 @@
-#  퓨전 모델: 다중 모달리티 입력을 위한 Fleximodal Fuse-MoE 구현 
+
 
 from __future__ import annotations
 from dataclasses import dataclass
@@ -110,12 +110,7 @@ import torch.nn as nn
 import math
 
 class Learned2DPos(nn.Module):
-    """
-    학습형 2D 위치임베딩: row(H) + col(W) 임베딩을 더함.
-    - max_H, max_W: 지원하는 최대 그리드(패치) 크기
-    - D: 모델 차원
-    주의: 입력 H,W가 max 범위를 넘어가면 modulo로 순환(index % max)
-    """
+
     def __init__(self, max_H: int, max_W: int, d_model: int, std: float = 0.02):
         super().__init__()
         self.max_H, self.max_W = max_H, max_W
@@ -306,17 +301,7 @@ class FlexiConfig:
 
 
 class FleximodalFuseMoE(nn.Module):
-    """
-    Inputs (encoders are external):
-        feats: dict[str, Tensor] where each Tensor is [B, T_m, d_in_m]
 
-    Setup:
-        - projection_bank: projects to common D
-        - time embeddings per modality (learned)
-        - modality embeddings (shared table)
-        - latent array (learned), Perceiver-style blocks with MoE FFN
-        - classification head on CLS latent (position 0)
-    """
     def __init__(self, modalities: List[str], proj_cfgs: Dict[str, ProjectionCfg], cfg: FlexiConfig):
         super().__init__()
         self.modalities = modalities
@@ -355,17 +340,17 @@ class FleximodalFuseMoE(nn.Module):
         tokens_list, mask_list = [], []
         device = next(self.parameters()).device
 
-        # proj_bank(feats): {m: [B,T,D]} 로 정규화되어 나온다고 가정
+ 
         for m, x in self.proj_bank(feats).items():
             B, T, D = x.shape
-            # 시간/모달 임베딩
+
             x = x + self.time_pos[m](B, T, device)
             x = x + self.mod_emb(self.mod2idx[m], B, T, device)
             tokens_list.append(x)
 
-            # 마스크 (존재하지 않는 모달은 collate에서 전부 False로 채워져 있을 것)
-            # masks[m]: Bool[B, T] (True=유효)
-            km = ~masks[m]                       # True=패딩/결측
+
+
+            km = ~masks[m]                
             mask_list.append(km)
 
         if len(tokens_list) == 1:
