@@ -1,28 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Build a MIMIC-CXR manifest CSV for Image–Text pipelines.
 
-Each row corresponds to one study (sXXXXXXX) and contains:
-    id, img_paths, report_text, split, subject, view, time
-
-- id:         study id (e.g., s53189527)
-- img_paths:  one or more absolute file paths to DICOMs, joined by '|'
-- report_text:contents of sXXXXXXX.txt
-- split:      train/val/test split by SUBJECT (patient) to avoid leakage
-- subject:    patient folder name (e.g., p10000032)
-- view/time:  left blank (placeholder)
-
-Designed to work with it_baseline_for_mimic.py.
-
-Example:
-    python make_mimic_manifest.py \
-        --base /data/jupyter/AGI/datasets/mimic-cxr/physionet.org/files/mimic-cxr/2.1.0 \
-        --subsets p10 \
-        --out /data/jupyter/AGI/datasets/mimic-cxr/mimic_manifest_p10.csv
-
-Author: AGI과제 / dxlab
-"""
 
 import os
 import argparse
